@@ -1,6 +1,6 @@
 import gradio as gr
 import uuid
-
+import streamlit as st
 import re
 import PyPDF2
 import numpy as np
@@ -148,3 +148,5 @@ with gr.Blocks(theme="default") as demo:
 if __name__ == "__main__":
     demo.launch(server_name="localhost", server_port=7860)
 
+st.title("Hello Streamlit!")
+st.write("This app is deployed from GitHub 🚀")
