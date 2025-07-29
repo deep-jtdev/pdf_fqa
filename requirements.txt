@@ -1,13 +1,10 @@
-streamlit
+treamlit
 transformers
 torch
 sentence-transformers
 PyPDF2
 scikit-learn
 numpy
-uuid
-sentence-transformers
 sentencepiece
 tiktoken
-os
 
