@@ -3,15 +3,16 @@ import torch
 
 # ✅ Use GPU if available, else CPU
 device = 0 if torch.cuda.is_available() else -1
-
-# ✅ Load model and tokenizer once (globally)
-print("first process")
-tokenizer = T5Tokenizer.from_pretrained("valhalla/t5-small-qg-hl", use_fast=True)
-print("second process")
-model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qg-hl")
-print("thrid process")
-qg_pipeline = pipeline("text2text-generation", model=model, tokenizer=tokenizer, device=device)
-
+try:
+    # ✅ Load model and tokenizer once (globally)
+    print("first process")
+    tokenizer = T5Tokenizer.from_pretrained("valhalla/t5-small-qg-hl", use_fast=True)
+    print("second process")
+    model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qg-hl")
+    print("thrid process")
+    qg_pipeline = pipeline("text2text-generation", model=model, tokenizer=tokenizer, device=device)
+except Exception:
+    print("some error")
 class QGenerator:
     def __init__(self):
         pass  # No need to reload model every time
