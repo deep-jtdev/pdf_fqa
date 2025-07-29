@@ -43,7 +43,7 @@ class create_db:
         conn = sqlite3.connect('my_database.db')
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT token_id, chunk_data, filename, full_content
+            SELECT token_id, chunk_data, filename
             FROM token_data
             WHERE token_id = ? OR filename = ?
         """, (identifier, identifier))
