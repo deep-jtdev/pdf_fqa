@@ -1,96 +1,76 @@
-import gradio as gr
-import uuid
 import streamlit as st
+import uuid
 import re
 import PyPDF2
 import numpy as np
-from transformers import  AutoTokenizer, AutoModelForSeq2SeqLM
-from sklearn.metrics.pairwise import cosine_similarity
+import json
 import os
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+from sklearn.metrics.pairwise import cosine_similarity
+
 from database1 import create_db
 from first1 import pdf_query
-
 from ans_generator1 import AnswerGenerator
-
-import  json
 from q_generator1 import QGenerator
-from transformers import pipeline
-# Initialize models
+
+# Load models
 qgen = QGenerator()
 ansgen = AnswerGenerator()
 tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base", use_fast=False)
 model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
 qa_model = pipeline("text2text-generation", model=model, tokenizer=tokenizer)
 
-# ✅ Upload and process PDF
+# Upload PDF
 def upload_pdf(files):
     try:
         messages = []
-
         for fil in files:
-            filename = os.path.basename(fil.name)  # <-- FIXED HERE
+            filename = os.path.basename(fil.name)
             token = str(uuid.uuid4())
-
             pdf_reader = PyPDF2.PdfReader(fil)
             text = "".join([page.extract_text() or "" for page in pdf_reader.pages])
             chunks = [text[i:i + 500] for i in range(0, len(text), 500)]
 
             create_db(token, chunks, filename)
             messages.append(f"✅ File Name: {filename}\n🔑 Token: {token}")
-
         return "\n\n".join(messages)
-
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-# ✅ Generate Questions & Answers
+# Generate Q&A
 def generate_qa(token):
     try:
         if not token:
             return "⚠️ Please provide a token."
 
-        print("📥 Received Token:", token)
-
-        row=create_db.fetch_by_token_or_filename(token)
-        print (row)
+        row = create_db.fetch_by_token_or_filename(token)
         if not row:
             return "❌ No data found for this token."
 
         chunks = json.loads(row['chunk_data'])
         qa_pairs = []
 
-        for i, chunk in enumerate(chunks):
-            print(f"\n🔹 Processing chunk {i+1}/{len(chunks)}")
+        for chunk in chunks:
             questions = qgen.generate(chunk)
-            print(f"🧠 Questions generated: {questions}")
-
             if not questions:
                 continue
-
-            for question in questions[:1]:
+            for question in questions[:1]:  # only 1 question per chunk
                 prompt = f"Context: {chunk}\n\nQuestion: {question}\n\nAnswer:"
-                try:
-                    result = qa_model(prompt, max_new_tokens=256, do_sample=False)
-                    if isinstance(result, list) and "generated_text" in result[0]:
-                        answer = result[0]["generated_text"].strip()
-                    else:
-                        answer = "N/A"
-
-                    qa_pairs.append(f"Q: {question}\nA: {answer}")
-
-                except Exception:
-                    continue
-
+                result = qa_model(prompt, max_new_tokens=256, do_sample=False)
+                if isinstance(result, list) and "generated_text" in result[0]:
+                    answer = result[0]["generated_text"].strip()
+                else:
+                    answer = "N/A"
+                qa_pairs.append(f"Q: {question}\nA: {answer}")
         return "\n\n".join(qa_pairs) if qa_pairs else "⚠️ No Q&A pairs generated."
-
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-# ✅ Ask a question using token
+# Ask question
 def ask_question(token, question):
     try:
-        row=create_db.fetch_by_token_or_filename(token)
-
+        row = create_db.fetch_by_token_or_filename(token)
         if not row:
             return "❌ Token not found."
 
@@ -111,42 +91,36 @@ def ask_question(token, question):
         best_text = clean_chunks[top_index]
 
         return f"Q: {question}\nA: {best_text}\nScore: {round(top_score, 3)}"
-
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-# ✅ Gradio UI
-with gr.Blocks(theme="default") as demo:
-    gr.Markdown(
-        """
-        <div style='text-align: center; padding: 1rem;'>
-            <h1 style='color: #3b82f6;'>📄 AI-Powered PDF Q&A System</h1>
-            <p style='font-size: 1.1rem;'>Upload your PDFs, generate smart questions, and get intelligent answers.</p>
-        </div>
-        """
-    )
+# Streamlit UI
+st.set_page_config(page_title="PDF Q&A AI System", layout="wide")
+st.title("📄 AI-Powered PDF Q&A System")
 
-    with gr.Tab("📤 1. Upload PDF"):
-        gr.Markdown("### 🗂 Upload a PDF File")
-        file = gr.File(label="Upload one or more PDFs", file_types=[".pdf"], file_count="multiple")
-        upload_out = gr.Textbox(label="Upload Result", interactive=False)
-        file.change(fn=upload_pdf, inputs=file, outputs=upload_out)
+tab1, tab2, tab3 = st.tabs(["📤 Upload PDF", "🧠 Generate Q&A", "❓ Ask a Question"])
 
-    with gr.Tab("🧠 2. Generate Questions & Answers"):
-        gr.Markdown("### 🤖 Generate Questions and Answers from Uploaded PDF")
-        token_input = gr.Textbox(label="🔑 Enter Received Token", placeholder="e.g., 123e4567-e89b-12d3-a456...")
-        output_box = gr.Textbox(label="📝 Generated Q&A", lines=15, interactive=False)
-        gr.Button("🚀 Generate Q&A").click(fn=generate_qa, inputs=token_input, outputs=output_box)
+with tab1:
+    st.header("Upload one or more PDF files")
+    uploaded_files = st.file_uploader("Choose PDFs", type=["pdf"], accept_multiple_files=True)
+    if st.button("Upload PDFs"):
+        if uploaded_files:
+            upload_result = upload_pdf(uploaded_files)
+            st.success(upload_result)
+        else:
+            st.warning("Please upload at least one PDF.")
 
-    with gr.Tab("❓ 3. Ask a Question"):
-        gr.Markdown("### 💬 Ask a question based on uploaded PDF")
-        token_box = gr.Textbox(label="Token ID", placeholder="e.g., 123e4567-e89b-12d3-a456...")
-        question_box = gr.Textbox(label="Type your question", placeholder="What is the main topic discussed?")
-        answer_result = gr.Textbox(label="Answer Output", lines=6, interactive=False)
-        gr.Button("🎯 Get Answer").click(fn=ask_question, inputs=[token_box, question_box], outputs=answer_result)
+with tab2:
+    st.header("Generate Questions and Answers from PDF")
+    token_input = st.text_input("Enter token from uploaded PDF")
+    if st.button("Generate Q&A"):
+        result = generate_qa(token_input.strip())
+        st.text_area("Generated Questions & Answers", result, height=300)
 
-if __name__ == "__main__":
-    demo.launch(server_name="localhost", server_port=7860)
-
-st.title("Hello Streamlit!")
-st.write("This app is deployed from GitHub 🚀")
+with tab3:
+    st.header("Ask a Question Based on PDF")
+    token = st.text_input("Token for lookup")
+    question = st.text_input("Enter your question")
+    if st.button("Get Answer"):
+        output = ask_question(token.strip(), question.strip())
+        st.text_area("Answer", output, height=200)
