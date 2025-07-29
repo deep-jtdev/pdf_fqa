@@ -1,0 +1,13 @@
+gradio
+transformers
+torch
+sentence-transformers
+PyPDF2
+scikit-learn
+numpy
+uuid
+sentence_transformers
+sentencepiece
+tiktoken
+
+
