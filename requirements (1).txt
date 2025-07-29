@@ -2,7 +2,7 @@ streamlit
 transformers
 torch
 sentence-transformers
-pypdf2
+PyPDF2
 scikit-learn
 numpy
 uuid
