@@ -5,7 +5,8 @@ torch
 sentence-transformers
 scikit-learn
 numpy
-sentencepiece
+sentencepiece==0.1.99
 tiktoken
+
 
 
