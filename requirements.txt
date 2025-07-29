@@ -1,10 +1,11 @@
 streamlit
+PyPDF2
 transformers
 torch
 sentence-transformers
-PyPDF2
 scikit-learn
 numpy
 sentencepiece
 tiktoken
+
 
